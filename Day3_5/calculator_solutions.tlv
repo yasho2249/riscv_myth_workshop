@@ -15,13 +15,22 @@
          
          // YOUR CODE HERE
          // ...
-         $val1[31:0] = $rand1[3:0];
-         $val2[31:0] = $rand2[3:0];
-         $out[31:0] = $op[1] ? ($op[0] ? $val1 / $val2 : $val1 * $val2) : ($op[0] ? $val1 - $val2 : $val1 + $val2);
-         $val1[31:0] = $reset ? 0 : (>>1$out);
          
-         $cnt[31:0] = $reset ? 0 : (>>1$cnt + 1);
-
+         $val2[31:0] = $rand2[3:0];
+         $quot[31:0] = $val1 / $val2;
+         $prod[31:0] = $val1 * $val2;
+         $diff[31:0] = $val1 - $val2;
+         $sum[31:0] = $val1 + $val2;
+         
+         $valid[0] = $reset ? 0 : >>1$valid + 1;
+         $val1[31:0] = >>1$out1;
+         
+      @1
+         
+         $out[31:0] = $op[1] ? ($op[0] ? $quot : $prod) : ($op[0] ? $diff : $sum);
+         $valid_reset[0] = $reset | ! $valid;
+         $out1[31:0] = $valid_reset ? 0 : >>1$out;
+         
       // Macro instantiations for calculator visualization(disabled by default).
       // Uncomment to enable visualisation, and also,
       // NOTE: If visualization is enabled, $op must be defined to the proper width using the expression below.
