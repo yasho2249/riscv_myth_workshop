@@ -22,14 +22,14 @@
          $diff[31:0] = $val1 - $val2;
          $sum[31:0] = $val1 + $val2;
          
-         $valid[0] = $reset ? 0 : >>1$valid + 1;
+         $valid[0] = $reset ? '0 : >>1$valid + 1;
          $val1[31:0] = >>1$out1;
          
       @1
          
          $out[31:0] = $op[1] ? ($op[0] ? $quot : $prod) : ($op[0] ? $diff : $sum);
          $valid_reset[0] = $reset | ! $valid;
-         $out1[31:0] = $valid_reset ? 0 : >>1$out;
+         $out1[31:0] = $valid_reset ? '0 : >>1$out;
          
       // Macro instantiations for calculator visualization(disabled by default).
       // Uncomment to enable visualisation, and also,
