@@ -1,7 +1,5 @@
 \m4_TLV_version 1d: tl-x.org
 \SV
-\m4_TLV_version 1d: tl-x.org
-\SV
    // This code can be found in: https://github.com/stevehoover/RISC-V_MYTH_Workshop
    
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/RISC-V_MYTH_Workshop/bd1f186fde018ff9e3fd80597b7397a1c862cf15/tlv_lib/calculator_shell_lib.tlv'])
@@ -21,6 +19,8 @@
          $val2[31:0] = $rand2[3:0];
          $out[31:0] = $op[1] ? ($op[0] ? $val1 / $val2 : $val1 * $val2) : ($op[0] ? $val1 - $val2 : $val1 + $val2);
          
+         
+         $cnt[31:0] = $reset ? -1 : (>>1$cnt + 1);
 
       // Macro instantiations for calculator visualization(disabled by default).
       // Uncomment to enable visualisation, and also,
@@ -41,4 +41,3 @@
 
 \SV
    endmodule
-
