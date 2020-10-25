@@ -23,11 +23,15 @@
          
          $valid[0] = $reset ? '0 : >>1$valid + 1;
          $val1[31:0] = >>2$out;
+         $valid_reset[0] = $reset | ! $valid;
          
       @2
          
-         $out[31:0] = $valid_reset ? '0 : $op[1] ? ($op[0] ? $quot : $prod) : ($op[0] ? $diff : $sum);
-         $valid_reset[0] = $reset | ! $valid;
+      ?$valid_reset   
+         @2
+         
+            $out[31:0] = $op[1] ? ($op[0] ? $quot : $prod) : ($op[0] ? $diff : $sum);
+         
          
          
       // Macro instantiations for calculator visualization(disabled by default).
