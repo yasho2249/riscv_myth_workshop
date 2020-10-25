@@ -18,9 +18,9 @@
          $val1[31:0] = $rand1[3:0];
          $val2[31:0] = $rand2[3:0];
          $out[31:0] = $op[1] ? ($op[0] ? $val1 / $val2 : $val1 * $val2) : ($op[0] ? $val1 - $val2 : $val1 + $val2);
+         $val1[31:0] = $reset ? 0 : (>>1$out);
          
-         
-         $cnt[31:0] = $reset ? -1 : (>>1$cnt + 1);
+         $cnt[31:0] = $reset ? 0 : (>>1$cnt + 1);
 
       // Macro instantiations for calculator visualization(disabled by default).
       // Uncomment to enable visualisation, and also,
