@@ -42,7 +42,10 @@
          $reset = *reset;
          
          //pc
-         $pc[31:0] = >>1$reset ? '0 : >>1$pc + 32'd4;
+         $pc[31:0] = >>1$reset ? '0 :
+                     >>1$taken_br ? >>1$br_tgt_pc :
+                     >>1$pc + 32'd4;
+         
          
       @1
          //read instr from imem(instruction memory)
@@ -52,22 +55,27 @@
          
          //DECODE LOGIC
          //identify tbe instr type
-         $is_i_instr = $instr[6:2] ==? 5'b0000x || $instr[6:2] ==? 5'b001x0 || $instr[6:2] ==? 5'b11001; //I-instr
-         $is_u_instr = $instr[6:2] ==? 5'b0x101; //U-instr
-         $is_r_instr = $instr[6:2] ==? 5'b01011 || $instr[6:2] ==? 5'b011x0 || $instr[6:2] ==? 5'b10100; //R-instr
-         $is_s_instr = $instr[6:2] ==? 5'b0100x; //S-instr
-         $is_b_instr = $instr[6:2] ==? 5'b11000; //B-instr
-         $is_j_instr = $instr[6:2] ==? 5'b11011; //J-instr
+         $is_i_instr = $instr[6:2] ==? 5'b0000x ||  
+                       $instr[6:2] ==? 5'b001x0 ||  //I-instr
+                       $instr[6:2] ==? 5'b11001;    
+         $is_u_instr = $instr[6:2] ==? 5'b0x101;    //U-instr
+         $is_r_instr = $instr[6:2] ==? 5'b01011 || 
+                       $instr[6:2] ==? 5'b011x0 ||  //R-instr
+                       $instr[6:2] ==? 5'b10100; 
+         $is_s_instr = $instr[6:2] ==? 5'b0100x;   //S-instr
+         $is_b_instr = $instr[6:2] ==? 5'b11000;   //B-instr
+         $is_j_instr = $instr[6:2] ==? 5'b11011;   //J-instr
          
          //imm decode for respective instr types
-         $imm[31:0] = $is_i_instr ? { {21{$instr[31]}}, $instr[30:20] } :
-                      $is_s_instr ? { {21{$instr[31]}}, $instr[30:25], $instr[11:7] } :
-                      $is_b_instr ? { {20{$instr[31]}}, $instr[7], $instr[30:20], $instr[11:8], '0 } :
-                      $is_u_instr ? { {$instr[31:12]}, '0 } :
-                      $is_j_instr ? { {12{$instr[31:12]}}, $instr[19:12], $instr[20], $instr[30:25], $instr[24:21], '0 } : '0;
+         $imm[31:0] = $is_i_instr ? { {21{$instr[31]}} , $instr[30:20] } :
+                      $is_s_instr ? { {21{$instr[31]}} , $instr[30:25] , $instr[11:7] } :
+                      $is_b_instr ? { {20{$instr[31]}} , $instr[7] , $instr[30:20] , $instr[11:8] , 1'b0 } :
+                      $is_u_instr ? { {$instr[31:12]} , 12'b0 } :
+                      $is_j_instr ? { {12{$instr[31]}} , $instr[19:12] , $instr[20] , $instr[30:21] , 1'b0 } : 
+                      32'b0;
          
          //remaining instr fields decode validity signals
-         $$rs2_valid    = $is_r_instr || $is_s_instr || $is_b_instr;
+         $rs2_valid    = $is_r_instr || $is_s_instr || $is_b_instr;
          $rs1_valid    = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
          $rd_valid     = $is_r_instr || $is_i_instr || $is_u_instr || $is_j_instr;
          $funct3_valid = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
@@ -77,11 +85,11 @@
          
          //validity and decode for respective fields in the instr
          ?$rs2_valid
-            $rs2[4:0]    = $instr[24:20];
+            $rs2[4:0] = $instr[24:20];
          ?$rs1_valid
-            $rs1[4:0]    = $instr[19:15];
+            $rs1[4:0] = $instr[19:15];
          ?$rd_valid
-            $rd[4:0]     = $instr[11:7];
+            $rd[4:0] = $instr[11:7];
          ?$funct3_valid
             $funct3[2:0] = $instr[14:12];
          ?$funct7_valid
@@ -91,27 +99,42 @@
          //note: this as of now only contains the opcodes needed for the program to be implemented
          //this note will be updated when other/all opcodes are included
          $dec_bits[10:0] = {$funct7[5], $funct3, $opcode};
-         $is_beq = $dec_bits ==? 11'bx_000_1100011;
-         $is_bne = $dec_bits ==? 11'bx_001_1100011;
-         $is_blt = $dec_bits ==? 11'bx_100_1100011;
-         $is_bge = $dec_bits ==? 11'bx_101_1100011;
-         $is_bltu = $dec_bits ==? 11'bx_110_1100011;
-         $is_blgeu = $dec_bits ==? 11'bx_111_1100011;
-         $is_add = $dec_bits ==? 11'bx_000_0010011;
-         $is_addi = $dec_bits ==? 11'b0_000_0110011;
          
-         `BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_blgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
+         $is_beq  = $dec_bits ==? 11'bx_000_1100011;
+         $is_bne  = $dec_bits ==? 11'bx_001_1100011;
+         $is_blt  = $dec_bits ==? 11'bx_100_1100011;
+         $is_bge  = $dec_bits ==? 11'bx_101_1100011;
+         $is_bltu = $dec_bits ==? 11'bx_110_1100011;
+         $is_bgeu = $dec_bits ==? 11'bx_111_1100011;
+         $is_add  = $dec_bits ==? 11'b0_000_0110011;
+         $is_addi = $dec_bits ==? 11'bx_000_0010011;
+         
+         `BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_bgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
          
          //REGISTER FILE READ LOGIC
-         //rs1 en/valid and read
+         //rs1 rd en/valid and read
          $rf_rd_en1 = $rs1_valid;
          $rf_rd_index1[4:0] = $rs1;
-         //rs2 en/valid and read
+         //rs2 rd en/valid and read
          $rf_rd_en2 = $rs2_valid;
          $rf_rd_index2[4:0] = $rs2;
-         
+         //rs wr en/valid and write
+         $rf_wr_en = ($rd == 5'b0) ? 1'b0 : $rd_valid;
+         $rf_wr_index[4:0] = $rd[4:0];
+         //src values for the ALU
          $src1_value[31:0] = $rf_rd_data1;
          $src2_value[31:0] = $rf_rd_data2;
+         
+         //BRANCHES
+         $taken_br = $is_beq ? ($src1_value == $src2_value) :
+                     $is_bne ? ($src1_value != $src2_value) :
+                     $is_blt ? (($src1_value < $src2_value) ^ ($src1_value[31] != $src2_value[31])) :
+                     $is_bge ? (($src1_value >= $src2_value) ^ ($src1_value[31] != $src2_value[31])) :
+                     $is_bltu ? ($src1_value <  $src2_value) :
+                     $is_bgeu ? ($src1_value >= $src2_value) : 1'b0;
+         
+         
+         $br_tgt_pc[31:0] = $pc + $imm; //target loaction(pc+imm)
          
          //ALU implementation
          //note: only contains add and addi as of now
@@ -119,13 +142,19 @@
          $result[31:0] = $is_addi ? $src1_value + $imm :
                          $is_add ? $src1_value + $src2_value :
                          32'bx;
+         
+         $rf_wr_data[31:0] = $result; //writing to the register
+         
+         
+         
+         
       // Note: Because of the magic we are using for visualisation, if visualisation is enabled below,
       //       be sure to avoid having unassigned signals (which you might be using for random inputs)
       //       other than those specifically expected in the labs. You'll get strange errors for these.
 
    
    // Assert these to end simulation (before Makerchip cycle limit).
-   *passed = *cyc_cnt > 40;
+   *passed = |cpu/xreg[10]>>5$value == (1+2+3+4+5+6+7+8+9);
    *failed = 1'b0;
    
    // Macro instantiations for:
