@@ -41,9 +41,54 @@
       @0
          $reset = *reset;
          
-         $pc = >>1$reset ? '0 : >>1$pc + 32'd4; 
+         //pc
+         $pc[31:0] = >>1$reset ? '0 : >>1$pc + 32'd4;
          
-      
+      @1
+         //read instr from imem(instruction memory)
+         $imem_rd_en = !$reset;
+         $imem_rd_addr[M4_IMEM_INDEX_CNT-1:0] = $pc[M4_IMEM_INDEX_CNT+1:2];
+         $instr[31:0] = $imem_rd_data;
+         
+         //DECODE LOGIC
+         //identify tbe instr type
+         $is_i_instr = $instr[6:2] ==? 5'b0000x || $instr[6:2] ==? 5'b001x0 || $instr[6:2] ==? 5'b11001; //I-instr
+         $is_u_instr = $instr[6:2] ==? 5'b0x101; //U-instr
+         $is_r_instr = $instr[6:2] ==? 5'b01011 || $instr[6:2] ==? 5'b011x0 || $instr[6:2] ==? 5'b10100; //R-instr
+         $is_s_instr = $instr[6:2] ==? 5'b0100x; //S-instr
+         $is_b_instr = $instr[6:2] ==? 5'b11000; //B-instr
+         $is_j_instr = $instr[6:2] ==? 5'b11011; //J-instr
+         
+         //imm decode for respective instr types
+         $imm[31:0] = $is_i_instr ? { {21{$instr[31]}}, $instr[30:20] } :
+                      $is_s_instr ? { {21{$instr[31]}}, $instr[30:25], $instr[11:7] } :
+                      $is_b_instr ? { {20{$instr[31]}}, $instr[7], $instr[30:20], $instr[11:8], '0 } :
+                      $is_u_instr ? { {$instr[31:12]}, '0 } :
+                      $is_j_instr ? { {12{$instr[31:12]}}, $instr[19:12], $instr[20], $instr[30:25], $instr[24:21], '0 } : '0;
+         
+         //remaining instr fields decode validity signals
+         $$rs2_valid    = $is_r_instr || $is_s_instr || $is_b_instr;
+         $rs1_valid    = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
+         $rd_valid     = $is_r_instr || $is_i_instr || $is_u_instr || $is_j_instr;
+         $funct3_valid = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
+         $funct7_valid = $is_r_instr;
+         
+         $opcode[6:0] = $instr[6:0]; //naming opcode
+         
+         //validity and decode for respective fields in the instr
+         ?$rs2_valid
+            $rs2[4:0]    = $instr[24:20];
+         ?$rs1_valid
+            $rs1[4:0]    = $instr[19:15];
+         ?$rd_valid
+            $rd[4:0]     = $instr[11:7];
+         ?$funct3_valid
+            $funct3[2:0] = $instr[14:12];
+         ?$funct7_valid
+            $funct7[6:0] = $instr[31:25];
+         
+         
+         
       // Note: Because of the magic we are using for visualisation, if visualisation is enabled below,
       //       be sure to avoid having unassigned signals (which you might be using for random inputs)
       //       other than those specifically expected in the labs. You'll get strange errors for these.
@@ -59,11 +104,11 @@
    //  o data memory
    //  o CPU visualization
    |cpu
-      //m4+imem(@1)    // Args: (read stage)
+      m4+imem(@1)    // Args: (read stage)
       //m4+rf(@1, @1)  // Args: (read stage, write stage) - if equal, no register bypass is required
       //m4+dmem(@4)    // Args: (read/write stage)
    
-   //m4+cpu_viz(@4)    // For visualisation, argument should be at least equal to the last stage of CPU logic
+   m4+cpu_viz(@4)    // For visualisation, argument should be at least equal to the last stage of CPU logic
                        // @4 would work for all labs
 \SV
    endmodule
