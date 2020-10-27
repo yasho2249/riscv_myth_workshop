@@ -45,6 +45,8 @@
          $pc[31:0] = >>1$reset ? '0 :
                      >>3$valid_taken_br ? >>3$br_tgt_pc :
                      >>3$valid_ld ? >>3$inc_pc :
+                     >>3$valid_jump && >>3$is_jal ? >>3$br_tgt_pc :
+                     >>3$valid_jump && >>3$is_jalr ? >>3$jalr_tgt_pc :
                      >>1$inc_pc;
          
          //Start and Valid Signals for the pipeline 
@@ -159,6 +161,9 @@
          $src1_value[31:0] = ((>>1$rf_wr_index == $rf_rd_index1) && >>1$rf_wr_en) ? >>1$result : $rf_rd_data1;
          $src2_value[31:0] = ((>>1$rf_wr_index == $rf_rd_index2) && >>1$rf_wr_en) ? >>1$result : $rf_rd_data2;
          
+         $br_tgt_pc[31:0] = $pc + $imm ; //target loaction for conditional branch(pc+imm)
+         $jalr_tgt_pc [31:0] = $src1_value + $imm; //target loaction for unconditional jmp
+         
       @3   
          //BRANCHINF LOGIC
          $taken_br = $is_beq ? $src1_value == $src2_value :
@@ -169,9 +174,8 @@
                      $is_bgeu ? $src1_value >= $src2_value : 1'b0;
          
          $valid_taken_br = $valid && $taken_br; //for valid branch in pipeline
-         $br_tgt_pc[31:0] = $pc + $imm ; //target loaction(pc+imm)
          
-         $valid = !(>>1$valid_taken_br || >>2$valid_taken_br || >>1$valid_ld || >>2$valid_ld); //updated valid
+         $valid = $reset ? 0 : !(>>1$valid_taken_br || >>2$valid_taken_br || >>1$valid_ld || >>2$valid_ld); //updated valid
          $valid_ld = $valid && $is_load ;
          
          //ALU implementation
@@ -208,14 +212,15 @@
                          32'bx;
          
          ?$valid
-            //$rf_wr_data[31:0] = !$valid ? >>2$ld_data : $result ; //writing to the register
-         $rf_wr_data[31:0] = >>2$valid_ld ? >>2$ld_data : $result;
+            $rf_wr_data[31:0] = !$valid ? >>2$ld_data : $result; //writing to the register
          
          $rf_wr_en = ( ($rd != 5'b0) && $rd_valid && $valid ) || >>2$valid_ld ;
          ?$rf_wr_en
             $rf_wr_index[4:0] = >>2$valid_ld ? >>2$rd: $rd[4:0];
          
-         
+         //jmp instr and validity signals
+         $is_jump = $is_jal || $is_jalr ;
+         $valid_jump = $valid && $is_jump ;
          
       @4
          $dmem_wr_en = $is_s_instr && $valid;
