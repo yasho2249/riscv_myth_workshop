@@ -49,7 +49,7 @@
          //Start and Valid Signals for the pipeline 
          ?$reset
             $start = >>1$reset - $reset;
-         $valid = $reset ? 1'b0 : $start ? 1'b1 : >>3$valid;
+         
          
       @1
          //read instr from imem(instruction memory)
@@ -142,6 +142,8 @@
          
          $valid_taken_br = $valid && $taken_br; //for valid branch in pipeline
          $br_tgt_pc[31:0] = $pc + $imm; //target loaction(pc+imm)
+         
+         $valid = !(>>1$valid_taken_br || >>2$valid_taken_br); //updated valid
          
          //ALU implementation
          //note: only contains add and addi as of now
