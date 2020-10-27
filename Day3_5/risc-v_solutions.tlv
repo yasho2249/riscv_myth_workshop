@@ -41,17 +41,23 @@
       @0
          $reset = *reset;
          
-         //pc
+         //PROGRAM COUNTER
          $pc[31:0] = >>1$reset ? '0 :
-                     >>1$taken_br ? >>1$br_tgt_pc :
-                     >>1$pc + 32'd4;
+                     >>3$valid_taken_br ? >>3$br_tgt_pc :
+                     >>3$inc_pc;
          
+         //Start and Valid Signals for the pipeline 
+         ?$reset
+            $start = >>1$reset - $reset;
+         $valid = $reset ? 1'b0 : $start ? 1'b1 : >>3$valid;
          
       @1
          //read instr from imem(instruction memory)
          $imem_rd_en = !$reset;
          $imem_rd_addr[M4_IMEM_INDEX_CNT-1:0] = $pc[M4_IMEM_INDEX_CNT+1:2];
          $instr[31:0] = $imem_rd_data;
+         
+         $inc_pc[31:0] = $pc + 32'd4; //increment counter for PC
          
          //DECODE LOGIC
          //identify tbe instr type
@@ -66,7 +72,7 @@
          $is_b_instr = $instr[6:2] ==? 5'b11000;   //B-instr
          $is_j_instr = $instr[6:2] ==? 5'b11011;   //J-instr
          
-         //imm decode for respective instr types
+         //immediate field decode for respective instr types
          $imm[31:0] = $is_i_instr ? { {21{$instr[31]}} , $instr[30:20] } :
                       $is_s_instr ? { {21{$instr[31]}} , $instr[30:25] , $instr[11:7] } :
                       $is_b_instr ? { {20{$instr[31]}} , $instr[7] , $instr[30:20] , $instr[11:8] , 1'b0 } :
@@ -77,19 +83,14 @@
          //remaining instr fields decode validity signals
          $rs2_valid    = $is_r_instr || $is_s_instr || $is_b_instr;
          $rs1_valid    = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
-         $rd_valid     = $is_r_instr || $is_i_instr || $is_u_instr || $is_j_instr;
          $funct3_valid = $is_r_instr || $is_s_instr || $is_b_instr || $is_i_instr;
          $funct7_valid = $is_r_instr;
-         
-         $opcode[6:0] = $instr[6:0]; //naming opcode
          
          //validity and decode for respective fields in the instr
          ?$rs2_valid
             $rs2[4:0] = $instr[24:20];
          ?$rs1_valid
             $rs1[4:0] = $instr[19:15];
-         ?$rd_valid
-            $rd[4:0] = $instr[11:7];
          ?$funct3_valid
             $funct3[2:0] = $instr[14:12];
          ?$funct7_valid
@@ -98,8 +99,8 @@
          //instr opcode decode (RV31I base inst set)
          //note: this as of now only contains the opcodes needed for the program to be implemented
          //this note will be updated when other/all opcodes are included
+         $opcode[6:0] = $instr[6:0]; //naming opcode
          $dec_bits[10:0] = {$funct7[5], $funct3, $opcode};
-         
          $is_beq  = $dec_bits ==? 11'bx_000_1100011;
          $is_bne  = $dec_bits ==? 11'bx_001_1100011;
          $is_blt  = $dec_bits ==? 11'bx_100_1100011;
@@ -109,23 +110,29 @@
          $is_add  = $dec_bits ==? 11'b0_000_0110011;
          $is_addi = $dec_bits ==? 11'bx_000_0010011;
          
-         `BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_bgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
+         //`BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_bgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
          
+      @2   
          //REGISTER FILE READ LOGIC
-         //rs1 rd en/valid and read
+         //validity signals for reg read
+         $rd_valid = $is_r_instr || $is_i_instr || $is_u_instr || $is_j_instr;
          $rf_rd_en1 = $rs1_valid;
-         $rf_rd_index1[4:0] = $rs1;
-         //rs2 rd en/valid and read
          $rf_rd_en2 = $rs2_valid;
-         $rf_rd_index2[4:0] = $rs2;
-         //rs wr en/valid and write
-         $rf_wr_en = ($rd == 5'b0) ? 1'b0 : $rd_valid;
-         $rf_wr_index[4:0] = $rd[4:0];
+         
+         //valid and drive
+         ?$rd_valid
+            $rd[4:0] = $instr[11:7];
+         ?$rf_rd_en1
+            $rf_rd_index1[4:0] = $rs1;
+         ?$rf_rd_en2
+            $rf_rd_index2[4:0] = $rs2;
+         
          //src values for the ALU
          $src1_value[31:0] = $rf_rd_data1;
          $src2_value[31:0] = $rf_rd_data2;
          
-         //BRANCHES
+      @3
+         //BRANCHINF LOGIC
          $taken_br = $is_beq ? ($src1_value == $src2_value) :
                      $is_bne ? ($src1_value != $src2_value) :
                      $is_blt ? (($src1_value < $src2_value) ^ ($src1_value[31] != $src2_value[31])) :
@@ -133,7 +140,7 @@
                      $is_bltu ? ($src1_value <  $src2_value) :
                      $is_bgeu ? ($src1_value >= $src2_value) : 1'b0;
          
-         
+         $valid_taken_br = $valid && $taken_br; //for valid branch in pipeline
          $br_tgt_pc[31:0] = $pc + $imm; //target loaction(pc+imm)
          
          //ALU implementation
@@ -143,9 +150,12 @@
                          $is_add ? $src1_value + $src2_value :
                          32'bx;
          
-         $rf_wr_data[31:0] = $result; //writing to the register
+         ?$valid
+            $rf_wr_data[31:0] = $result; //writing to the register
          
-         
+         $rf_wr_en = ($rd == 5'b0) ? 1'b0 : $rd_valid && $valid;
+         ?$rf_wr_en
+            $rf_wr_index[4:0] = $rd[4:0];
          
          
       // Note: Because of the magic we are using for visualisation, if visualisation is enabled below,
@@ -164,7 +174,7 @@
    //  o CPU visualization
    |cpu
       m4+imem(@1)    // Args: (read stage)
-      m4+rf(@1, @1)  // Args: (read stage, write stage) - if equal, no register bypass is required
+      m4+rf(@2, @3)  // Args: (read stage, write stage) - if equal, no register bypass is required
       //m4+dmem(@4)    // Args: (read/write stage)
    
    m4+cpu_viz(@4)    // For visualisation, argument should be at least equal to the last stage of CPU logic
