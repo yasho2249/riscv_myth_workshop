@@ -44,7 +44,8 @@
          //PROGRAM COUNTER
          $pc[31:0] = >>1$reset ? '0 :
                      >>3$valid_taken_br ? >>3$br_tgt_pc :
-                     >>3$inc_pc;
+                     >>3$valid_ld ? >>3$inc_pc :
+                     >>1$inc_pc;
          
          //Start and Valid Signals for the pipeline 
          ?$reset
@@ -170,7 +171,8 @@
          $valid_taken_br = $valid && $taken_br; //for valid branch in pipeline
          $br_tgt_pc[31:0] = $pc + $imm; //target loaction(pc+imm)
          
-         $valid = !(>>1$valid_taken_br || >>2$valid_taken_br); //updated valid
+         $valid = !(>>1$valid_taken_br || >>2$valid_taken_br || >>1$valid_ld); //updated valid
+         $valid_ld = $valid && $is_load;
          
          //ALU implementation
          
@@ -180,6 +182,8 @@
          //
          $result[31:0] = $is_addi ? $src1_value + $imm :
                          $is_add ? $src1_value + $src2_value :
+                         $is_load ? $src1_value + $imm :
+                         $is_s_instr ? $src1_value + $imm :
                          $is_andi ? $src1_value && $imm :
                          $is_ori ? $src1_value || $imm :
                          $is_xori ? $src1_value ^ $imm :
@@ -207,9 +211,9 @@
                          32'bx;
          
          ?$valid
-            $rf_wr_data[31:0] = $result; //writing to the register
+            $rf_wr_data[31:0] = >>2$valid_ld ? >>2$ld_data : $result; //writing to the register
          
-         $rf_wr_en = ($rd == 5'b0) ? 1'b0 : $rd_valid && $valid;
+         $rf_wr_en = ( ($rd != 5'b0) && $rd_valid && $valid ) || >>2$valid_ld ;
          ?$rf_wr_en
             $rf_wr_index[4:0] = $rd[4:0];
          
