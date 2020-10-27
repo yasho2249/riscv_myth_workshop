@@ -97,7 +97,7 @@
             $funct7[6:0] = $instr[31:25];
          
          //instr opcode decode (RV31I base inst set)
-         //note: this as of now only contains the opcodes needed for the program to be implemented
+         //note: this now contains all the opcodes EXCEPT fence, ecall, ebreak 
          //this note will be updated when other/all opcodes are included
          $opcode[6:0] = $instr[6:0]; //naming opcode
          $dec_bits[10:0] = {$funct7[5], $funct3, $opcode};
@@ -110,7 +110,34 @@
          $is_add  = $dec_bits ==? 11'b0_000_0110011;
          $is_addi = $dec_bits ==? 11'bx_000_0010011;
          
-         //`BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_bgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
+         //implemented remaining ISA
+         $is_lui  = $opcode ==?  7'b0010111;
+         $is_auipc = $opcode ==? 7'b0010111;
+         $is_jal  = $opcode ==?  7'b1101111;
+         $is_jalr = $dec_bits ==? 11'bx_000_1100111;
+         $is_load = $opcode ==?  7'b0000011;
+         $is_sb   = $dec_bits ==? 11'bx_000_0100011;
+         $is_sh   = $dec_bits ==? 11'bx_001_0100011;
+         $is_sw   = $dec_bits ==? 11'bx_010_0100011;
+         $is_slti = $dec_bits ==? 11'bx_010_0010011;
+         $is_sltiu = $dec_bits ==? 11'bx_011_0010011;
+         $is_xori = $dec_bits ==? 11'bx_100_0010011;
+         $is_ori  = $dec_bits ==? 11'bx_110_0010011;
+         $is_andi = $dec_bits ==? 11'bx_111_0010011;
+         $is_slli = $dec_bits ==? 11'b0_001_0010011;
+         $is_srli = $dec_bits ==? 11'b0_101_0010011;
+         $is_srai = $dec_bits ==? 11'b1_101_0010011;
+         $is_sub  = $dec_bits ==? 11'b1_000_0110011;
+         $is_sll  = $dec_bits ==? 11'b0_001_0110011;
+         $is_slt  = $dec_bits ==? 11'b0_010_0110011;
+         $is_sltu = $dec_bits ==? 11'b0_011_0110011;
+         $is_xor  = $dec_bits ==? 11'b0_100_0110011;
+         $is_srl  = $dec_bits ==? 11'b0_101_0110011;
+         $is_sra  = $dec_bits ==? 11'b1_101_0110011;
+         $is_or   = $dec_bits ==? 11'b0_110_0110011;
+         $is_and  = $dec_bits ==? 11'b0_111_0110011;
+         
+         `BOGUS_USE($is_beq $is_bne $is_blt $is_bge $is_bltu $is_bgeu $is_add $is_addi); //to stop with the unsigned/unused warning in log
          
       @2   
          //REGISTER FILE READ LOGIC
